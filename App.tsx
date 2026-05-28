@@ -1,12 +1,6 @@
 import React, { useState } from "react";
 import {
-  View,
-  Text,
-  TextInput,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  Alert,
+  View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView, Alert,
 } from "react-native";
 
 export default function App() {
@@ -17,6 +11,9 @@ export default function App() {
   const [height, setHeight] = useState("");
   const [volumetricWeight, setVolumetricWeight] = useState("");
   const [billedWeight, setBilledWeight] = useState("");
+  const [loading, setLoading] = useState(false);
+const [shipmentFare, setShipmentFare] = useState("");
+
   const isFormValid =
   originPincode &&
   destinationPincode &&
@@ -24,7 +21,7 @@ export default function App() {
   breadth &&
   height;
 
-const calculateWeight = () => {
+  const calculateWeight = async () => {
   const l = parseFloat(length);
   const b = parseFloat(breadth);
   const h = parseFloat(height);
@@ -34,21 +31,60 @@ const calculateWeight = () => {
     return;
   }
 
-    const volumetric = (l * b * h) / 5000;
-    const billed = Math.ceil(volumetric * 2) / 2;
+  const volumetric = (l * b * h) / 5000;
+  const billed = Math.ceil(volumetric * 2) / 2;
+
+  setLoading(true);
+
+  try {
+    const response = await fetch(
+      "http://apidev.vyomxpress.com/vendor/order/shipmentFare",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": "7f3a1c6e9b12d48f88aebf75c2a341dc",
+          Authorization: "Bearer YOUR_TOKEN_HERE",
+        },
+        body: JSON.stringify({
+          originPincode,
+          destinationPincode,
+          length: l,
+          breadth: b,
+          height: h,
+          billedWeight: billed,
+        }),
+      }
+    );
+
+    const data = await response.json();
+
+    console.log("API Response:", data);
 
     setVolumetricWeight(volumetric.toFixed(2));
     setBilledWeight(billed.toFixed(2));
+
+    if (data?.shipmentFare) {
+      setShipmentFare(data.shipmentFare.toString());
+    }
+
+  } catch (error) {
+    console.log("API Error:", error);
+    Alert.alert("Error", "Something went wrong.");
+  } finally {
+    setLoading(false);
+  }
 };
 
-    const resetForm = () => {
-      setOriginPincode("");
-      setDestinationPincode("");
-      setLength("");
-      setBreadth("");
-      setHeight("");
-      setVolumetricWeight("");
-      setBilledWeight("");
+  const resetForm = () => {
+  setOriginPincode("");
+  setDestinationPincode("");
+  setLength("");
+  setBreadth("");
+  setHeight("");
+  setVolumetricWeight("");
+  setBilledWeight("");
+  setShipmentFare("");
 };
 
   return (
@@ -113,7 +149,9 @@ const calculateWeight = () => {
         ]}
         onPress={calculateWeight}
         disabled={!isFormValid} >
-        <Text style={styles.buttonText}>Calculate</Text>
+          <Text style={styles.buttonText}>
+          {loading ? "Calculating..." : "Calculate"}
+        </Text>
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.clearButton} onPress={resetForm}>
@@ -134,6 +172,14 @@ const calculateWeight = () => {
             {billedWeight ? `${billedWeight} kg` : "--"}
           </Text>
         </View>
+
+        <View style={styles.resultRow}>
+          <Text style={styles.resultLabel}>Shipment Fare</Text>
+          <Text style={styles.resultValue}>
+            {shipmentFare ? `₹${shipmentFare}` : "--"}
+          </Text>
+        </View>
+
       </View>
     </ScrollView>
   );
