@@ -16,7 +16,6 @@ export default function App() {
   const [billedWeight, setBilledWeight] = useState("");
   const [shipmentFare, setShipmentFare] = useState("");
 
-  const [loading, setLoading] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
@@ -31,6 +30,7 @@ export default function App() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [token, setToken] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const isFormValid =
     originPincode &&
@@ -60,54 +60,61 @@ export default function App() {
 
   const loginVendor = async () => {
   try {
+    setLoading(true);
+    console.log("LOGIN STARTED");
+
     const response = await fetch(
-      "https://apidev.vyomxpress.com/vendor/login",
+      "https://api.vyomxpress.com/vendor/login",
       {
-      method: "POST",
-      headers: {
-      "Content-Type": "application/json",
-      "x-api-key":
-      "7f3a1c6e9b12d48f88aebf75c2a341dc",
-      },
-      body: JSON.stringify({
-      email,
-      password,
-      }),
-    }
-  );
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": "e52f98a7c4d6b0913f20e75a89b34fe1",
+        },
+        body: JSON.stringify({
+          email,
+          password,
+        }),
+      }
+    );
 
-  const data = await response.json();
-  console.log("LOGIN RESPONSE:", data);
+    console.log("STATUS:", response.status);
 
-  if (data?.status === "success") {
+    const data = await response.json();
 
-  await AsyncStorage.setItem(
-  "vendorToken",
-  data.data.token
-  );
+    console.log("LOGIN RESPONSE:", data);
 
-  setToken(data.data.token);
-  setIsLoggedIn(true);
+    if (data?.status === "success") {
+      await AsyncStorage.setItem(
+        "vendorToken",
+        data.data.token
+      );
 
-  Alert.alert(
-  "Success",
-  "Login Successful"
-  ); 
-  }else {
+      setToken(data.data.token);
+      setIsLoggedIn(true);
+
+      Alert.alert(
+        "Success",
+        "Login Successful"
+      );
+    } else {
       Alert.alert(
         "Login Failed",
         data?.message || "Invalid credentials"
       );
     }
   } catch (error) {
-    console.log(error);
+    console.log("LOGIN ERROR:", error);
 
     Alert.alert(
       "Error",
       "Unable to login"
     );
+  } finally {
+    setLoading(false);
   }
 };
+
   const checkLogin = async () => {
   try {
     const savedToken =
@@ -135,6 +142,66 @@ export default function App() {
   }
 };
 
+  const deleteAccount = async () => {
+  Alert.alert(
+    "Delete Account",
+    "Are you sure you want to delete your account? This action cannot be undone.",
+    [
+    {
+      text: "Cancel",
+      style: "cancel",
+    },
+    {
+      text: "Delete",
+      style: "destructive",
+      onPress: async () => {
+      try {
+
+      console.log("DELETE REQUEST STARTED");
+      console.log("TOKEN:", token);
+
+        const response = await fetch(
+          "https://api.vyomxpress.com/deleteAccount",
+      {
+        method: "POST",
+        headers: {
+        Authorization: `Bearer ${token}`,
+        "x-api-key": "e52f98a7c4d6b0913f20e75a89b34fe1",
+    },
+  }
+);
+
+  console.log("DELETE STATUS:", response.status);
+
+  const data = await response.json();
+
+  console.log("DELETE RESPONSE:", data);
+
+  if (response.ok) {
+  await AsyncStorage.removeItem("vendorToken");
+
+  setToken("");
+  setIsLoggedIn(false);
+
+  Alert.alert(
+    "Success",
+    "Your account has been deleted successfully."
+  );
+  } else {
+  Alert.alert(
+    "Error",
+    data.message || "Failed to delete account."
+    );
+  }
+} catch (error) {
+  console.log("DELETE ERROR:", error);
+  Alert.alert("Error", "Something went wrong.");
+        }
+      },
+    },
+  ]
+);
+};
 
   const calculateWeight = async () => {
   const l = parseFloat(length);
@@ -153,18 +220,22 @@ export default function App() {
 
   try {
     const response = await fetch(
-  `https://apidev.vyomxpress.com/vendor/order/shipmentFare?receiverPincode=${destinationPincode}&originPincode=${originPincode}&height=${h}&width=${b}&length=${l}&weight=500&codAmount=0`,
+  `https://api.vyomxpress.com/vendor/order/shipmentFare?receiverPincode=${destinationPincode}&originPincode=${originPincode}&height=${h}&width=${b}&length=${l}&weight=500&codAmount=0`,
   {
     method: "GET",
     headers: {
       Authorization: `Bearer ${token}`,
       "x-api-key":
-        "7f3a1c6e9b12d48f88aebf75c2a341dc",
+        "e52f98a7c4d6b0913f20e75a89b34fe1",
     },
     }
   );
 
+  console.log("SHIPMENT STATUS:", response.status);
+
     const data = await response.json();
+
+     console.log("SHIPMENT RESPONSE:", data);
 
     console.log("API Response:", data);
 
@@ -281,13 +352,18 @@ export default function App() {
       style={styles.input}/>
 
       <TouchableOpacity
-      style={styles.button}
-      onPress={loginVendor}>
-      <Text style={styles.buttonText}>
-      Login
-      </Text>
-      </TouchableOpacity>
-    </View>
+      style={[
+      styles.button,
+      loading && { opacity: 0.6 }
+   ]}
+    disabled={loading}
+    onPress={loginVendor}>
+
+    <Text style={styles.buttonText}>
+    {loading ? "Logging in..." : "Login"}
+    </Text>
+  </TouchableOpacity>
+  </View>
   );
 }
 
@@ -300,34 +376,33 @@ export default function App() {
       <Text style={[styles.title, { color: theme.text }]}>
         Vyomxpress Rate Calculator
       </Text>
+      <View style={styles.actionBar}>
 
-        <TouchableOpacity
-      onPress={logout}
-      style={{
-        alignSelf: "flex-end",
-        backgroundColor: "#ff4d4f",
-        paddingHorizontal: 15,
-        paddingVertical: 8,
-        borderRadius: 8,
-        marginBottom: 15,
-    }}>
-      <Text
-        style={{
-        color: "#fff",
-        fontWeight: "bold",
-        }}>
-        Logout
-      </Text>
+  <TouchableOpacity
+      style={styles.themeButton}
+      onPress={() => setIsDarkMode(!isDarkMode)}>
+    <Text style={styles.actionText}>
+      {isDarkMode ? "☀️" : "🌙"}
+   </Text>
     </TouchableOpacity>
 
-      <TouchableOpacity
-        style={styles.darkModeToggle}
-        onPress={() => setIsDarkMode(!isDarkMode)}>
-        <Text style={styles.darkModeIcon}>
-          {isDarkMode ? "☀️" : "🌙"}
-      </Text>
-      </TouchableOpacity>
+    <TouchableOpacity
+      onPress={logout}
+      style={styles.logoutButton}>
+    <Text style={styles.actionText}>
+      Logout
+    </Text>
+    </TouchableOpacity>
 
+    <TouchableOpacity
+      onPress={deleteAccount}
+      style={styles.deleteButton}>
+    <Text style={styles.actionText}>
+      Delete
+    </Text>
+    </TouchableOpacity>
+    </View>
+        
       <Text style={[styles.label, { color: theme.subText }]}>
         Origin Pincode
       </Text>
@@ -345,8 +420,7 @@ export default function App() {
         placeholderTextColor={theme.subText}
         value={originPincode}
         onChangeText={setOriginPincode}
-        keyboardType="numeric"
-      />
+        keyboardType="numeric"/>
 
       <Text style={[styles.label, { color: theme.subText }]}>
         Destination Pincode
@@ -365,8 +439,7 @@ export default function App() {
         placeholderTextColor={theme.subText}
         value={destinationPincode}
         onChangeText={setDestinationPincode}
-        keyboardType="numeric"
-      />
+        keyboardType="numeric"/>
 
       <View style={styles.row}>
         <View style={styles.halfInputContainer}>
@@ -680,22 +753,39 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
 
-  darkModeToggle: {
-  position: "absolute",
-  top: 15,
-  right: 15,
-  width: 50,
-  height: 50,
-  borderRadius: 25,
-  backgroundColor: "#000",
-  justifyContent: "center",
-  alignItems: "center",
-  zIndex: 999,
+  actionBar: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    marginBottom: 20,
   },
 
-  darkModeIcon: {
-  fontSize: 22,
-  color: "#fff",
+  themeButton: {
+    backgroundColor: "#111827",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    marginRight: 8,
+  },
+
+  logoutButton: {
+    backgroundColor: "#ff4d4f",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    marginRight: 8,
+  },
+
+  deleteButton: {
+    backgroundColor: "#d9363e",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+
+  actionText: {
+    color: "#fff",
+    fontWeight: "bold",
   },
 
   label: {
